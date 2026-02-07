@@ -385,7 +385,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 For questions, issues, or contributions:
 
 - **GitHub Issues**: [Report bugs or request features](https://github.com/p-H-7/CampusGuard/issues)
-- **Email**: hpinnepu@gmail.com
+- **Email**: [your.email@example.com]
 - **Documentation**: See `/docs` folder for detailed technical documentation
 
 ---
