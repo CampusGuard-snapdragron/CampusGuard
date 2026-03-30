@@ -53,12 +53,13 @@ fun CameraPreviewScreen() {
     // Initialize inference engine
     val inferenceEngine = remember { InferenceEngine(context) }
 
-    // Sender -> your laptop server IP
+    // Configurable server URL from settings
+    val settingsManager = remember { SettingsManager(context) }
+    val alertHistoryManager = remember { AlertHistoryManager(context) }
     val alertSender = remember {
         AlertSender(
-//            apiBase = "http://10.206.138.203:8787",
-            apiBase = "http://192.168.1.27:8787",
-            token = "demo-token"
+            apiBase = settingsManager.serverUrl,
+            token = settingsManager.authToken
         )
     }
 
@@ -177,6 +178,15 @@ fun CameraPreviewScreen() {
                 if (verdict != null) {
                     val frameToSend = lastFrameBitmap
                     val res = detectionResult!!
+
+                    // Save to local history
+                    alertHistoryManager.addAlert(
+                        AlertRecord(
+                            eventType = res.eventType,
+                            confidence = res.confidence,
+                            verdict = verdict
+                        )
+                    )
 
                     alertSender.sendAlert(
                         deviceId = deviceId,

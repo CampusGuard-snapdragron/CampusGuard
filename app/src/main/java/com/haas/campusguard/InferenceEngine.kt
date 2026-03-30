@@ -33,7 +33,7 @@ class InferenceEngine(private val context: Context) {
     // thresholds
     private val personThreshold = 0.40f
     private val knifeThreshold = 0.35f
-
+;
     init {
         try {
             ortEnvironment = OrtEnvironment.getEnvironment()
