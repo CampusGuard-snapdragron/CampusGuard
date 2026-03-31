@@ -22,7 +22,7 @@ export interface AlertStats {
 }
 
 export interface Settings {
-  serverPort: string
+  cloudUrl: string
   serverToken: string
   ollamaUrl: string
   ollamaModel: string

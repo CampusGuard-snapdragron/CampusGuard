@@ -282,7 +282,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 value = serverUrl,
                 onValueChange = { serverUrl = it },
                 label = { Text("Server URL") },
-                placeholder = { Text("http://192.168.1.100:8787") },
+                placeholder = { Text("https://your-server.railway.app") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )

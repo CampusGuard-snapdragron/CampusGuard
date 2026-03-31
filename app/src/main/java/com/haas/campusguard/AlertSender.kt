@@ -24,6 +24,8 @@ class AlertSender(
         frameBitmap: Bitmap?,
         notes: String? = null
     ) {
+        if (apiBase.isBlank()) return
+
         val obj = JSONObject().apply {
             put("deviceId", deviceId)
             put("eventType", eventType)

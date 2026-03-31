@@ -4,7 +4,7 @@ import type { OllamaStatus, Settings as SettingsType } from '../types'
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<SettingsType>({
-    serverPort: '8787',
+    cloudUrl: '',
     serverToken: 'demo-token',
     ollamaUrl: 'http://localhost:11434',
     ollamaModel: 'llama3.2',
@@ -62,13 +62,14 @@ export default function SettingsPage() {
       </h2>
 
       {/* Server Config */}
-      <Section title="Alert Server" icon={<Server size={18} />}>
-        <Field label="Port" description="Port the Express server listens on for incoming alerts from Android devices">
+      <Section title="Cloud Server" icon={<Server size={18} />}>
+        <Field label="Cloud Server URL" description="URL of the CampusGuard cloud server (e.g. https://your-server.railway.app)">
           <input
             type="text"
-            value={settings.serverPort}
-            onChange={e => setSettings(prev => ({ ...prev, serverPort: e.target.value }))}
+            value={settings.cloudUrl}
+            onChange={e => setSettings(prev => ({ ...prev, cloudUrl: e.target.value }))}
             className="input-field"
+            placeholder="https://your-server.railway.app"
           />
         </Field>
         <Field label="Auth Token" description="Must match x-campusguard-token header from Android app">

@@ -8,7 +8,7 @@ class SettingsManager(context: Context) {
         context.getSharedPreferences("campusguard_settings", Context.MODE_PRIVATE)
 
     var serverUrl: String
-        get() = prefs.getString("server_url", "http://10.206.162.129:8787") ?: "http://10.206.162.129:8787"
+        get() = prefs.getString("server_url", "") ?: ""
         set(value) = prefs.edit().putString("server_url", value).apply()
 
     var authToken: String

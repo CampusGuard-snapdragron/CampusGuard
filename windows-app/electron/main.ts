@@ -1,9 +1,49 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
-import { initDatabase, getDb } from './database'
-import { startServer, stopServer } from './server'
+import fs from 'fs'
+import * as api from './api'
 
 let mainWindow: BrowserWindow | null = null
+
+// ---- Local settings JSON ----
+
+const settingsPath = () => path.join(app.getPath('userData'), 'settings.json')
+
+const defaultSettings: Record<string, string> = {
+  cloudUrl: '',
+  serverToken: 'demo-token',
+  ollamaUrl: 'http://localhost:11434',
+  ollamaModel: 'llama3.2',
+  cloudProvider: 'none',
+  cloudApiKey: '',
+  autoAnalyze: 'true',
+}
+
+function loadSettings(): Record<string, string> {
+  try {
+    const raw = fs.readFileSync(settingsPath(), 'utf-8')
+    return { ...defaultSettings, ...JSON.parse(raw) }
+  } catch {
+    return { ...defaultSettings }
+  }
+}
+
+function saveSettings(settings: Record<string, string>) {
+  fs.writeFileSync(settingsPath(), JSON.stringify(settings, null, 2))
+}
+
+function getSetting(key: string): string {
+  const settings = loadSettings()
+  return settings[key] ?? defaultSettings[key] ?? ''
+}
+
+function setSetting(key: string, value: string) {
+  const settings = loadSettings()
+  settings[key] = value
+  saveSettings(settings)
+}
+
+// ---- Window ----
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -35,96 +75,46 @@ function createWindow() {
 
 // ---- IPC Handlers ----
 
-ipcMain.handle('alerts:getAll', async (_event, { limit, offset } = {}) => {
-  const db = getDb()
-  const l = limit || 100
-  const o = offset || 0
-  return db.prepare('SELECT * FROM alerts ORDER BY timestamp DESC LIMIT ? OFFSET ?').all(l, o)
+ipcMain.handle('alerts:getAll', async (_event, opts) => {
+  return api.getAlerts(opts)
 })
 
 ipcMain.handle('alerts:getById', async (_event, id: number) => {
-  const db = getDb()
-  return db.prepare('SELECT * FROM alerts WHERE id = ?').get(id)
+  return api.getAlertById(id)
 })
 
 ipcMain.handle('alerts:getStats', async () => {
-  const db = getDb()
-  const total = db.prepare('SELECT COUNT(*) as count FROM alerts').get() as any
-  const today = db.prepare(
-    "SELECT COUNT(*) as count FROM alerts WHERE timestamp > datetime('now', '-1 day')"
-  ).get() as any
-  const highSeverity = db.prepare(
-    "SELECT COUNT(*) as count FROM alerts WHERE severity = 'high'"
-  ).get() as any
-  const byType = db.prepare(
-    'SELECT eventType, COUNT(*) as count FROM alerts GROUP BY eventType ORDER BY count DESC LIMIT 10'
-  ).all()
-  const byHour = db.prepare(
-    "SELECT strftime('%H', timestamp) as hour, COUNT(*) as count FROM alerts WHERE timestamp > datetime('now', '-1 day') GROUP BY hour ORDER BY hour"
-  ).all()
-  const recentDevices = db.prepare(
-    'SELECT DISTINCT deviceId FROM alerts ORDER BY timestamp DESC LIMIT 20'
-  ).all()
-
-  return {
-    total: total.count,
-    today: today.count,
-    highSeverity: highSeverity.count,
-    byType,
-    byHour,
-    activeDevices: recentDevices.length,
-  }
+  return api.getStats()
 })
 
 ipcMain.handle('alerts:delete', async (_event, id: number) => {
-  const db = getDb()
-  db.prepare('DELETE FROM alerts WHERE id = ?').run(id)
-  return { success: true }
+  return api.deleteAlert(id)
 })
 
 ipcMain.handle('alerts:addLocal', async (_event, alert: any) => {
-  const db = getDb()
-  const stmt = db.prepare(`
-    INSERT INTO alerts (deviceId, eventType, modelConfidence, operatorVerdict, notes, severity, timestamp)
-    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-  `)
-  const result = stmt.run(
-    alert.deviceId || 'local-webcam',
-    alert.eventType,
-    alert.modelConfidence || 0,
-    alert.operatorVerdict || 'AUTO',
-    alert.notes || '',
-    alert.severity || 'medium'
-  )
-  return { id: result.lastInsertRowid }
+  return api.postAlert(alert)
 })
 
 ipcMain.handle('settings:get', async () => {
-  const db = getDb()
-  const rows = db.prepare('SELECT key, value FROM settings').all() as any[]
-  const settings: Record<string, string> = {}
-  for (const row of rows) {
-    settings[row.key] = row.value
-  }
-  return settings
+  return loadSettings()
 })
 
 ipcMain.handle('settings:set', async (_event, key: string, value: string) => {
-  const db = getDb()
-  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value)
+  setSetting(key, value)
+  // Re-configure API client when cloud settings change
+  if (key === 'cloudUrl' || key === 'serverToken') {
+    const settings = loadSettings()
+    api.configure(settings.cloudUrl, settings.serverToken)
+  }
   return { success: true }
 })
 
 ipcMain.handle('llm:analyze', async (_event, alertData: any) => {
-  const db = getDb()
-  const settings = db.prepare('SELECT key, value FROM settings').all() as any[]
-  const config: Record<string, string> = {}
-  for (const row of settings) config[row.key] = row.value
-
-  const ollamaUrl = config['ollamaUrl'] || 'http://localhost:11434'
-  const ollamaModel = config['ollamaModel'] || 'llama3.2'
-  const cloudApiKey = config['cloudApiKey'] || ''
-  const cloudProvider = config['cloudProvider'] || 'none'
+  const settings = loadSettings()
+  const ollamaUrl = settings.ollamaUrl || 'http://localhost:11434'
+  const ollamaModel = settings.ollamaModel || 'llama3.2'
+  const cloudApiKey = settings.cloudApiKey || ''
+  const cloudProvider = settings.cloudProvider || 'none'
 
   const prompt = buildThreatPrompt(alertData)
 
@@ -182,9 +172,8 @@ ipcMain.handle('llm:analyze', async (_event, alertData: any) => {
 })
 
 ipcMain.handle('llm:checkOllama', async () => {
-  const db = getDb()
-  const row = db.prepare("SELECT value FROM settings WHERE key = 'ollamaUrl'").get() as any
-  const url = row?.value || 'http://localhost:11434'
+  const settings = loadSettings()
+  const url = settings.ollamaUrl || 'http://localhost:11434'
   try {
     const response = await fetch(`${url}/api/tags`)
     if (response.ok) {
@@ -217,22 +206,51 @@ Provide:
 Be concise and actionable. This is for campus security personnel.`
 }
 
-// Broadcast new alerts to renderer
-function notifyNewAlert(alert: any) {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('alert:new', alert)
+// ---- Polling for new alerts ----
+
+let lastAlertId = 0
+let pollInterval: ReturnType<typeof setInterval> | null = null
+
+async function pollForNewAlerts() {
+  try {
+    const alerts = await api.getAlerts({ limit: 1 })
+    if (Array.isArray(alerts) && alerts.length > 0) {
+      const latest = alerts[0]
+      if (latest.id > lastAlertId) {
+        if (lastAlertId > 0 && mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('alert:new', latest)
+        }
+        lastAlertId = latest.id
+      }
+    }
+  } catch {
+    // Server unreachable, skip this poll
   }
 }
 
-// Export for server to use
-export { notifyNewAlert }
+function startPolling() {
+  if (pollInterval) return
+  pollInterval = setInterval(pollForNewAlerts, 5000)
+  // Initial fetch to set lastAlertId baseline
+  pollForNewAlerts()
+}
+
+function stopPolling() {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
+}
 
 // ---- App Lifecycle ----
 
 app.whenReady().then(async () => {
-  initDatabase()
-  startServer(notifyNewAlert)
+  const settings = loadSettings()
+  // Persist defaults if file didn't exist
+  saveSettings(settings)
+  api.configure(settings.cloudUrl, settings.serverToken)
   createWindow()
+  startPolling()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -242,7 +260,7 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
-  stopServer()
+  stopPolling()
   if (process.platform !== 'darwin') {
     app.quit()
   }

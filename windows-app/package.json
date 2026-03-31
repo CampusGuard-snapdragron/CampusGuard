@@ -13,10 +13,6 @@
   "author": "CampusGuard Team",
   "license": "MIT",
   "dependencies": {
-    "better-sqlite3": "^11.7.0",
-    "cors": "^2.8.5",
-    "express": "^4.21.0",
-    "multer": "^1.4.5-lts.1",
     "onnxruntime-web": "^1.20.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -25,9 +21,6 @@
     "lucide-react": "^0.460.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^5.0.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",

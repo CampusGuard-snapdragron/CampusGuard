@@ -1,11 +1,14 @@
 import Database from 'better-sqlite3'
-import { app } from 'electron'
 import path from 'path'
+import fs from 'fs'
 
 let db: Database.Database
 
 export function initDatabase() {
-  const dbPath = path.join(app.getPath('userData'), 'campusguard.db')
+  const dataDir = process.env.DATA_DIR || './data'
+  fs.mkdirSync(dataDir, { recursive: true })
+
+  const dbPath = path.join(dataDir, 'campusguard.db')
   db = new Database(dbPath)
 
   db.pragma('journal_mode = WAL')
@@ -45,6 +48,7 @@ export function initDatabase() {
     cloudProvider: 'none',
     cloudApiKey: '',
     autoAnalyze: 'true',
+    cloudUrl: '',
   }
 
   const insertSetting = db.prepare(
