@@ -17,6 +17,11 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
   next()
 }
 
+// Root
+app.get('/', (_req, res) => {
+  res.json({ status: 'ok', app: 'CampusGuard Server', version: '1.0.0' })
+})
+
 // Health check (no auth)
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', app: 'CampusGuard Server', version: '1.0.0' })
