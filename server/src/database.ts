@@ -12,6 +12,9 @@ export function initDatabase() {
   db = new Database(dbPath)
 
   db.pragma('journal_mode = WAL')
+  db.pragma('synchronous = NORMAL')
+  db.pragma('temp_store = MEMORY')
+  db.pragma('cache_size = -64000') // 64MB cache
   db.pragma('foreign_keys = ON')
 
   db.exec(`
