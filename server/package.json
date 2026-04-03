@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc && npm run build:dashboard",
-    "build:dashboard": "cd ../windows-app && npm run build:web && mkdir -p ../server/public/dashboard && cp -r dist/* ../server/public/dashboard/",
+    "build:dashboard": "if [ -d \"../windows-app\" ]; then (cd ../windows-app && npm run build:web); else echo \"⚠️ Skipping dashboard build (Context: Subdirectory)\"; fi",
     "start": "node dist/index.js"
   },
   "dependencies": {
