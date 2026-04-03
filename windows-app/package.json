@@ -6,12 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:web": "export VITE_APP_MODE=web && tsc && vite build",
     "preview": "vite preview",
     "package": "npm run build && electron-builder --win",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\""
   },
-  "author": "CampusGuard Team",
-  "license": "MIT",
+  "author": "Arya Shidore <aryashidore2002@gmail.com>",
+  "license": "UNLICENSED",
   "dependencies": {
     "onnxruntime-web": "^1.20.0",
     "react": "^18.3.1",
@@ -39,6 +40,8 @@
   "build": {
     "appId": "com.campusguard.desktop",
     "productName": "CampusGuard",
+    "icon": "public/icon.png",
+    "artifactName": "CampusGuard-Setup-${version}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -61,10 +64,10 @@
       ]
     },
     "appx": {
-      "identityName": "CampusGuard",
-      "publisher": "CN=CampusGuard",
-      "publisherDisplayName": "CampusGuard Team",
-      "applicationId": "CampusGuard"
+      "identityName": "REPLACE_WITH_PARTNER_CENTER_IDENTITY_NAME",
+      "publisher": "CN=REPLACE_WITH_YOUR_CERT_CN",
+      "publisherDisplayName": "REPLACE_WITH_PARTNER_CENTER_DISPLAY_NAME",
+      "applicationId": "REPLACE_WITH_PARTNER_CENTER_APP_ID"
     }
   }
 }

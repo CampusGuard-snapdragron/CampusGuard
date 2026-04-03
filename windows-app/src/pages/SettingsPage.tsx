@@ -4,8 +4,8 @@ import type { OllamaStatus, Settings as SettingsType } from '../types'
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<SettingsType>({
-    cloudUrl: '',
-    serverToken: 'demo-token',
+    cloudUrl: 'https://campusguard-server-production.up.railway.app',
+    serverToken: '8bb29658ad048ef57e46d5665bf6c9014aa9f6d62c776e06261a8ef8541caa24',
     ollamaUrl: 'http://localhost:11434',
     ollamaModel: 'llama3.2',
     cloudProvider: 'none',

@@ -7,28 +7,31 @@ import path from 'path'
 export default defineConfig({
   plugins: [
     react(),
-    electron([
-      {
-        entry: 'electron/main.ts',
-        vite: {
-          build: {
-            outDir: 'dist-electron',
+    // Only include Electron plugins if not in web mode
+    ...(process.env.VITE_APP_MODE === 'web' ? [] : [
+      electron([
+        {
+          entry: 'electron/main.ts',
+          vite: {
+            build: {
+              outDir: 'dist-electron',
+            }
           }
-        }
-      },
-      {
-        entry: 'electron/preload.ts',
-        onstart(args) {
-          args.reload()
         },
-        vite: {
-          build: {
-            outDir: 'dist-electron'
+        {
+          entry: 'electron/preload.ts',
+          onstart(args) {
+            args.reload()
+          },
+          vite: {
+            build: {
+              outDir: 'dist-electron'
+            }
           }
         }
-      }
-    ]),
-    electronRenderer()
+      ]),
+      electronRenderer()
+    ])
   ],
   resolve: {
     alias: {

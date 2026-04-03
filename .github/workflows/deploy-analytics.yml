@@ -1,0 +1,25 @@
+name: Deploy Analytics Dashboard (Streamlit)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Dashboard/dashboard/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Deploy to Railway
+        run: |
+          railway up --service campusguard-analytics -d
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        working-directory: Dashboard/dashboard

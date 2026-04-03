@@ -302,7 +302,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 value = serverUrl,
                 onValueChange = { serverUrl = it },
                 label = { Text("Server URL") },
-                placeholder = { Text("https://your-server.railway.app") },
+                placeholder = { Text("https://campusguard-server-production.up.railway.app") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
