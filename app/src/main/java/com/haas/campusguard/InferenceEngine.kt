@@ -30,9 +30,9 @@ class InferenceEngine(private val context: Context) {
     private val personClassIndex = 0
     private val knifeClassIndex = 43
 
-    // thresholds
-    private val personThreshold = 0.40f
-    private val knifeThreshold = 0.35f
+    // thresholds (lowered for better sensitivity)
+    private val personThreshold = 0.30f
+    private val knifeThreshold = 0.25f
 ;
     init {
         try {
@@ -306,7 +306,7 @@ class InferenceEngine(private val context: Context) {
         val currentBox = floatArrayOf(x, y, w, h)
         val displacement = calculateDisplacement(currentBox)
 
-        if (displacement > 150f) {
+        if (displacement > 50f) {
             Log.i("InferenceEngine", "⚠️ ANOMALY: Rapid movement! Displacement: $displacement")
             return DetectionResult(
                 isAnomalous = true,

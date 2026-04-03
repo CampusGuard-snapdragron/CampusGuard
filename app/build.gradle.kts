@@ -56,6 +56,9 @@ dependencies {
     // ONNX Runtime for AI models
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.0")
 
+    // MediaPipe LLM Inference for on-device threat analysis (Snapdragon GPU)
+    implementation("com.google.mediapipe:tasks-genai:0.10.22")
+
     // WebSocket for sending alerts to laptop
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 

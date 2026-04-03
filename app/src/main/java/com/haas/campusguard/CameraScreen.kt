@@ -4,6 +4,7 @@ import android.Manifest
 import android.graphics.Bitmap
 import android.provider.Settings
 import android.util.Log
+import android.widget.Toast
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -20,6 +21,9 @@ import androidx.core.content.ContextCompat
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -62,8 +66,22 @@ fun CameraPreviewScreen() {
         )
     }
 
+    // On-device LLM for threat analysis (runs on Snapdragon GPU/NPU)
+    val llmEngine = remember { LocalLlmEngine(context) }
+    var llmReady by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
+    // Initialize LLM in background
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            llmReady = llmEngine.initialize()
+        }
+        if (llmReady) Log.d("CameraScreen", "On-device LLM ready")
+    }
+
     var detectionResult by remember { mutableStateOf<DetectionResult?>(null) }
     var showAlertDialog by remember { mutableStateOf(false) }
+    var sendingAlert by remember { mutableStateOf(false) }
 
     // Keep the latest frame to attach as a screengrab
     var lastFrameBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -93,8 +111,8 @@ fun CameraPreviewScreen() {
                     imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
                         frameCount++
 
-                        // Process every 10th frame (~3fps at 30fps camera)
-                        if (frameCount % 10 == 0) {
+                        // Process every 5th frame (~6fps at 30fps camera)
+                        if (frameCount % 5 == 0) {
                             try {
                                 val bitmap = imageProxy.toBitmap()
 
@@ -108,7 +126,7 @@ fun CameraPreviewScreen() {
                                     "Detection: ${result.eventType}, conf=${result.confidence}, anomalous=${result.isAnomalous}"
                                 )
 
-                                if (result.isAnomalous && result.confidence > 0.35f) {
+                                if (result.isAnomalous && result.confidence > 0.25f) {
                                     detectionResult = result
                                     showAlertDialog = true
                                 }
@@ -148,11 +166,26 @@ fun CameraPreviewScreen() {
                 .align(Alignment.TopCenter)
                 .padding(16.dp)
         ) {
-            Text(
-                text = "🛡️ CampusGuard Monitoring...",
-                modifier = Modifier.padding(12.dp),
-                style = MaterialTheme.typography.titleMedium
-            )
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "CampusGuard Monitoring...",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = if (llmReady) "LLM: On-device (Gemma 3 1B)" else "LLM: Not loaded",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (llmReady) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (sendingAlert) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Text(
+                        text = if (llmReady) "Analyzing threat & sending alert..." else "Sending alert...",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
         }
     }
 
@@ -177,15 +210,34 @@ fun CameraPreviewScreen() {
                 if (verdict != null) {
                     val frameToSend = lastFrameBitmap
                     val res = detectionResult!!
+                    sendingAlert = true
 
-                    alertSender.sendAlert(
-                        deviceId = deviceId,
-                        eventType = res.eventType,
-                        modelConfidence = res.confidence,
-                        operatorVerdict = verdict,
-                        frameBitmap = frameToSend,
-                        notes = "Operator confirmed on phone"
-                    )
+                    // Run LLM analysis (if available) + send alert in background
+                    coroutineScope.launch(Dispatchers.IO) {
+                        val analysis = if (llmReady) {
+                            llmEngine.analyzeThreat(res.eventType, res.confidence, verdict)
+                        } else null
+
+                        alertSender.sendAlert(
+                            deviceId = deviceId,
+                            eventType = res.eventType,
+                            modelConfidence = res.confidence,
+                            operatorVerdict = verdict,
+                            frameBitmap = frameToSend,
+                            notes = "Operator confirmed on phone",
+                            llmAnalysis = analysis
+                        )
+
+                        withContext(Dispatchers.Main) {
+                            sendingAlert = false
+                            Toast.makeText(
+                                context,
+                                if (analysis != null) "Alert sent with AI analysis"
+                                else "Alert sent",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
                 }
 
                 showAlertDialog = false

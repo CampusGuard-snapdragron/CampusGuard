@@ -30,7 +30,7 @@ app.get('/health', (_req, res) => {
 // Receive alert from Android phones
 app.post('/alert', authMiddleware, (req, res) => {
   const db = getDb()
-  const { deviceId, eventType, modelConfidence, operatorVerdict, notes, imageBase64 } = req.body
+  const { deviceId, eventType, modelConfidence, operatorVerdict, notes, imageBase64, llmAnalysis } = req.body
 
   if (!deviceId || !eventType) {
     res.status(400).json({ error: 'Missing deviceId or eventType' })
@@ -44,8 +44,8 @@ app.post('/alert', authMiddleware, (req, res) => {
   if (operatorVerdict === 'MAYBE') severity = 'medium'
 
   const stmt = db.prepare(`
-    INSERT INTO alerts (deviceId, eventType, modelConfidence, operatorVerdict, notes, severity, imageBase64, timestamp)
-    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO alerts (deviceId, eventType, modelConfidence, operatorVerdict, notes, severity, imageBase64, llmAnalysis, timestamp)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
   `)
 
   const result = stmt.run(
@@ -55,7 +55,8 @@ app.post('/alert', authMiddleware, (req, res) => {
     operatorVerdict || 'AUTO',
     notes || '',
     severity,
-    imageBase64 || ''
+    imageBase64 || '',
+    llmAnalysis || ''
   )
 
   res.json({ success: true, alertId: result.lastInsertRowid })

@@ -1,12 +1,15 @@
 package com.haas.campusguard
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -21,8 +24,16 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.haas.campusguard.ui.theme.CampusGuardTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -247,11 +258,18 @@ fun AlertHistoryScreen(onBack: () -> Unit) {
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val settingsManager = remember { SettingsManager(context) }
+    val llmEngine = remember { LocalLlmEngine(context) }
+    val coroutineScope = rememberCoroutineScope()
 
     var serverUrl by remember { mutableStateOf(settingsManager.serverUrl) }
     var authToken by remember { mutableStateOf(settingsManager.authToken) }
     var autoSend by remember { mutableStateOf(settingsManager.autoSendAlerts) }
     var saved by remember { mutableStateOf(false) }
+
+    // LLM model state
+    var modelDownloaded by remember { mutableStateOf(llmEngine.isModelDownloaded()) }
+    var downloadProgress by remember { mutableStateOf(-1f) }
+    var downloadStatus by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -269,9 +287,11 @@ fun SettingsScreen(onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── Server Configuration ──
             Text(
                 "Server Configuration",
                 style = MaterialTheme.typography.titleMedium,
@@ -307,8 +327,6 @@ fun SettingsScreen(onBack: () -> Unit) {
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
             Button(
                 onClick = {
                     settingsManager.serverUrl = serverUrl
@@ -327,6 +345,144 @@ fun SettingsScreen(onBack: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            // ── On-Device LLM ──
+            Text(
+                "On-Device LLM (Snapdragon GPU)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Text(
+                "Gemma 3 1B INT4 — runs threat analysis locally on your phone. " +
+                "No cloud API needed.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (modelDownloaded)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            if (modelDownloaded) Icons.Default.Done else Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = if (modelDownloaded) MaterialTheme.colorScheme.primary
+                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            if (modelDownloaded) "Model ready" else "Model not downloaded",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    if (modelDownloaded) {
+                        val modelFile = llmEngine.getModelFile()
+                        Text(
+                            "Size: ${modelFile.length() / 1024 / 1024} MB",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
+            if (!modelDownloaded) {
+                if (downloadProgress >= 0f) {
+                    LinearProgressIndicator(
+                        progress = { downloadProgress },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        downloadStatus,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                } else {
+                    Button(
+                        onClick = {
+                            downloadProgress = 0f
+                            downloadStatus = "Starting download..."
+                            coroutineScope.launch(Dispatchers.IO) {
+                                try {
+                                    val modelUrl = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task"
+                                    val client = OkHttpClient.Builder()
+                                        .connectTimeout(30, TimeUnit.SECONDS)
+                                        .readTimeout(5, TimeUnit.MINUTES)
+                                        .build()
+
+                                    val request = Request.Builder().url(modelUrl).build()
+                                    val response = client.newCall(request).execute()
+
+                                    if (!response.isSuccessful) {
+                                        withContext(Dispatchers.Main) {
+                                            downloadStatus = "Download failed: HTTP ${response.code}"
+                                            downloadProgress = -1f
+                                        }
+                                        return@launch
+                                    }
+
+                                    val body = response.body ?: throw Exception("Empty response")
+                                    val totalBytes = body.contentLength()
+                                    val modelFile = llmEngine.getModelFile()
+                                    val tempFile = File(modelFile.parent, "${modelFile.name}.tmp")
+
+                                    body.byteStream().use { input ->
+                                        FileOutputStream(tempFile).use { output ->
+                                            val buffer = ByteArray(8192)
+                                            var bytesRead: Long = 0
+                                            var len: Int
+
+                                            while (input.read(buffer).also { len = it } != -1) {
+                                                output.write(buffer, 0, len)
+                                                bytesRead += len
+                                                val progress = if (totalBytes > 0) bytesRead.toFloat() / totalBytes else 0f
+                                                withContext(Dispatchers.Main) {
+                                                    downloadProgress = progress
+                                                    downloadStatus = "${bytesRead / 1024 / 1024} MB / ${totalBytes / 1024 / 1024} MB"
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    tempFile.renameTo(modelFile)
+
+                                    withContext(Dispatchers.Main) {
+                                        modelDownloaded = true
+                                        downloadProgress = -1f
+                                        downloadStatus = "Download complete!"
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("Settings", "Model download failed: ${e.message}", e)
+                                    withContext(Dispatchers.Main) {
+                                        downloadStatus = "Failed: ${e.message}"
+                                        downloadProgress = -1f
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Download Model (~529 MB)")
+                    }
+
+                    Text(
+                        "Or push via ADB:\nadb push gemma3-1b-it-int4.task /data/data/com.haas.campusguard/files/",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

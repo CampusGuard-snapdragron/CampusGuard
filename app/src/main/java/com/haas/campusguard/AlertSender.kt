@@ -32,7 +32,8 @@ class AlertSender(
         modelConfidence: Float?,
         operatorVerdict: String, // "YES" or "MAYBE"
         frameBitmap: Bitmap?,
-        notes: String? = null
+        notes: String? = null,
+        llmAnalysis: String? = null
     ) {
         if (apiBase.isBlank()) {
             Log.w("AlertSender", "Server URL is blank — alert not sent. Set URL in Settings.")
@@ -45,6 +46,7 @@ class AlertSender(
             put("operatorVerdict", operatorVerdict)
             if (modelConfidence != null) put("modelConfidence", modelConfidence.toDouble())
             if (notes != null) put("notes", notes)
+            if (llmAnalysis != null) put("llmAnalysis", llmAnalysis)
 
             if (frameBitmap != null) {
                 val baos = ByteArrayOutputStream()
