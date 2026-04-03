@@ -10,7 +10,7 @@ class LocalLlmEngine(private val context: Context) {
 
     companion object {
         private const val TAG = "LocalLlmEngine"
-        const val MODEL_FILENAME = "gemma3-1b-it-int4.task"
+        const val MODEL_FILENAME = "TinyLlama-1.1B-Chat-v1.0_multi-prefill-seq_q8_ekv1280.task"
     }
 
     private var llmInference: LlmInference? = null

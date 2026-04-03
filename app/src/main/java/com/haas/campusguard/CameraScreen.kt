@@ -172,7 +172,7 @@ fun CameraPreviewScreen() {
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
-                    text = if (llmReady) "LLM: On-device (Gemma 3 1B)" else "LLM: Not loaded",
+                    text = if (llmReady) "LLM: On-device (TinyLlama 1.1B)" else "LLM: Not loaded",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (llmReady) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant

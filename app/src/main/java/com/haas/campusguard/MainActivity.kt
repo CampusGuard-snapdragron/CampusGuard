@@ -374,7 +374,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "Gemma 3 1B is running on-device. " +
+                            "TinyLlama 1.1B is running on-device. " +
                             "Threat analysis runs automatically when you confirm alerts.",
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -430,7 +430,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 downloadStatus = "Connecting..."
                                 coroutineScope.launch(Dispatchers.IO) {
                                     try {
-                                        val modelUrl = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task"
+                                        val modelUrl = "https://huggingface.co/litert-community/TinyLlama-1.1B-Chat-v1.0/resolve/main/TinyLlama-1.1B-Chat-v1.0_multi-prefill-seq_q8_ekv1280.task"
                                         val client = OkHttpClient.Builder()
                                             .connectTimeout(30, TimeUnit.SECONDS)
                                             .readTimeout(5, TimeUnit.MINUTES)
@@ -491,7 +491,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Set Up AI Analysis (downloads ~529 MB)")
+                            Text("Set Up AI Analysis (downloads ~1.1 GB)")
                         }
                     }
                 }
