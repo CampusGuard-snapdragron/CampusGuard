@@ -53,9 +53,8 @@ fun CameraPreviewScreen() {
     // Initialize inference engine
     val inferenceEngine = remember { InferenceEngine(context) }
 
-    // Configurable server URL from settings
+    // Read server URL from settings (set in Settings screen)
     val settingsManager = remember { SettingsManager(context) }
-    val alertHistoryManager = remember { AlertHistoryManager(context) }
     val alertSender = remember {
         AlertSender(
             apiBase = settingsManager.serverUrl,
@@ -94,13 +93,13 @@ fun CameraPreviewScreen() {
                     imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
                         frameCount++
 
-                        // Process every 15th frame to reduce compute
-                        if (frameCount % 15 == 0) {
+                        // Process every 10th frame (~3fps at 30fps camera)
+                        if (frameCount % 10 == 0) {
                             try {
                                 val bitmap = imageProxy.toBitmap()
 
-                                // Save latest frame (scaled smaller for network + memory)
-                                lastFrameBitmap = Bitmap.createScaledBitmap(bitmap, 640, 480, true)
+                                // Save latest frame for alert (already ~640x480 from camera)
+                                lastFrameBitmap = bitmap
 
                                 val result = inferenceEngine.detectAnomaly(bitmap)
 
@@ -178,15 +177,6 @@ fun CameraPreviewScreen() {
                 if (verdict != null) {
                     val frameToSend = lastFrameBitmap
                     val res = detectionResult!!
-
-                    // Save to local history
-                    alertHistoryManager.addAlert(
-                        AlertRecord(
-                            eventType = res.eventType,
-                            confidence = res.confidence,
-                            verdict = verdict
-                        )
-                    )
 
                     alertSender.sendAlert(
                         deviceId = deviceId,
@@ -299,7 +289,7 @@ fun ImageProxy.toBitmap(): Bitmap {
     val out = java.io.ByteArrayOutputStream()
     yuvImage.compressToJpeg(
         android.graphics.Rect(0, 0, this.width, this.height),
-        90,
+        75,
         out
     )
 

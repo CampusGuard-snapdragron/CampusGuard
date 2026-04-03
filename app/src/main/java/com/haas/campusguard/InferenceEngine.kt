@@ -159,22 +159,19 @@ class InferenceEngine(private val context: Context) {
         val env = ortEnvironment ?: throw IllegalStateException("OrtEnvironment is null")
         val resized = Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, true)
 
-        val floatArray = FloatArray(1 * 3 * inputSize * inputSize)
-        var idx = 0
+        // Bulk pixel access — ~10x faster than per-pixel getPixel()
+        val pixelCount = inputSize * inputSize
+        val pixels = IntArray(pixelCount)
+        resized.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize)
 
-        // NCHW: channels first
-        for (c in 0 until 3) {
-            for (y in 0 until inputSize) {
-                for (x in 0 until inputSize) {
-                    val pixel = resized.getPixel(x, y)
-                    val value = when (c) {
-                        0 -> android.graphics.Color.red(pixel)
-                        1 -> android.graphics.Color.green(pixel)
-                        else -> android.graphics.Color.blue(pixel)
-                    }
-                    floatArray[idx++] = value / 255.0f
-                }
-            }
+        val floatArray = FloatArray(3 * pixelCount)
+
+        // NCHW layout: all R, then all G, then all B
+        for (i in 0 until pixelCount) {
+            val pixel = pixels[i]
+            floatArray[i]                  = ((pixel shr 16) and 0xFF) / 255.0f  // R
+            floatArray[i + pixelCount]     = ((pixel shr 8) and 0xFF) / 255.0f   // G
+            floatArray[i + 2 * pixelCount] = (pixel and 0xFF) / 255.0f           // B
         }
 
         val shape = longArrayOf(1, 3, inputSize.toLong(), inputSize.toLong())
