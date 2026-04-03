@@ -1,4 +1,4 @@
-# CampusGuard 🛡️
+# (Qualcomm Hackathon Winner) CampusGuard 🛡️
 
 **Real-Time AI-Powered Campus Safety Monitoring**
 
