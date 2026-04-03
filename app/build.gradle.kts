@@ -35,6 +35,14 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 dependencies {
@@ -57,12 +65,9 @@ dependencies {
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.0")
 
     // MediaPipe LLM Inference for on-device threat analysis (Snapdragon GPU)
-    implementation("com.google.mediapipe:tasks-genai:0.10.22")
+    implementation("com.google.mediapipe:tasks-genai:0.10.33")
 
-    // WebSocket for sending alerts to laptop
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-
-    // Coroutines (probably already there, but just in case)
+    // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     // Gson for JSON

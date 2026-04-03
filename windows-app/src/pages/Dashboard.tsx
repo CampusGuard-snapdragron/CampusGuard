@@ -240,6 +240,24 @@ export default function Dashboard() {
                 <RefreshCw className="animate-spin" size={16} />
                 <span className="text-sm">Analyzing threat...</span>
               </div>
+            ) : selectedAlert?.llmAnalysis ? (
+              /* Show on-device analysis from phone */
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xs px-2 py-0.5 bg-emerald-600/20 text-emerald-300 rounded-full">
+                    On-Device AI (Snapdragon)
+                  </span>
+                </div>
+                <p className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">
+                  {selectedAlert.llmAnalysis}
+                </p>
+                <button
+                  onClick={() => analyzeAlert(selectedAlert)}
+                  className="mt-3 text-xs text-gray-500 hover:text-indigo-400 transition-colors"
+                >
+                  Re-analyze with desktop LLM
+                </button>
+              </div>
             ) : llmResult ? (
               <div>
                 <div className="flex items-center gap-2 mb-3">
@@ -253,6 +271,7 @@ export default function Dashboard() {
               </div>
             ) : selectedAlert ? (
               <div className="text-center py-4">
+                <p className="text-xs text-gray-500 mb-3">No AI analysis from device</p>
                 <button
                   onClick={() => analyzeAlert(selectedAlert)}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm font-medium transition-colors"
@@ -262,7 +281,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <p className="text-sm text-gray-500 text-center py-4">
-                Select an alert to analyze
+                Select an alert to view analysis
               </p>
             )}
           </div>

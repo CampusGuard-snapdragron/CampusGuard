@@ -347,20 +347,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // ── On-Device LLM ──
+            // ── AI Threat Analysis ──
             Text(
-                "On-Device LLM (Snapdragon GPU)",
+                "AI Threat Analysis",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                "Gemma 3 1B INT4 — runs threat analysis locally on your phone. " +
-                "No cloud API needed.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Card(
@@ -372,116 +365,135 @@ fun SettingsScreen(onBack: () -> Unit) {
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            if (modelDownloaded) Icons.Default.Done else Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = if (modelDownloaded) MaterialTheme.colorScheme.primary
-                                   else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    if (modelDownloaded) {
                         Text(
-                            if (modelDownloaded) "Model ready" else "Model not downloaded",
+                            "AI Ready",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Gemma 3 1B is running on-device. " +
+                            "Threat analysis runs automatically when you confirm alerts.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        val modelFile = llmEngine.getModelFile()
+                        Text(
+                            "Model size: ${modelFile.length() / 1024 / 1024} MB",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else if (downloadProgress >= 0f) {
+                        Text(
+                            "Downloading AI Model...",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
-                    }
-
-                    if (modelDownloaded) {
-                        val modelFile = llmEngine.getModelFile()
-                        Text(
-                            "Size: ${modelFile.length() / 1024 / 1024} MB",
-                            style = MaterialTheme.typography.bodySmall
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LinearProgressIndicator(
+                            progress = { downloadProgress },
+                            modifier = Modifier.fillMaxWidth(),
                         )
-                    }
-                }
-            }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            downloadStatus,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            "On-Device AI Not Set Up",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Download a small AI model to analyze threats directly on your phone. " +
+                            "No internet needed for analysis after setup.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (downloadStatus.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                downloadStatus,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                downloadProgress = 0f
+                                downloadStatus = "Connecting..."
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    try {
+                                        val modelUrl = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task"
+                                        val client = OkHttpClient.Builder()
+                                            .connectTimeout(30, TimeUnit.SECONDS)
+                                            .readTimeout(5, TimeUnit.MINUTES)
+                                            .followRedirects(true)
+                                            .build()
 
-            if (!modelDownloaded) {
-                if (downloadProgress >= 0f) {
-                    LinearProgressIndicator(
-                        progress = { downloadProgress },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Text(
-                        downloadStatus,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                } else {
-                    Button(
-                        onClick = {
-                            downloadProgress = 0f
-                            downloadStatus = "Starting download..."
-                            coroutineScope.launch(Dispatchers.IO) {
-                                try {
-                                    val modelUrl = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task"
-                                    val client = OkHttpClient.Builder()
-                                        .connectTimeout(30, TimeUnit.SECONDS)
-                                        .readTimeout(5, TimeUnit.MINUTES)
-                                        .build()
+                                        val request = Request.Builder().url(modelUrl).build()
+                                        val response = client.newCall(request).execute()
 
-                                    val request = Request.Builder().url(modelUrl).build()
-                                    val response = client.newCall(request).execute()
-
-                                    if (!response.isSuccessful) {
-                                        withContext(Dispatchers.Main) {
-                                            downloadStatus = "Download failed: HTTP ${response.code}"
-                                            downloadProgress = -1f
+                                        if (!response.isSuccessful) {
+                                            withContext(Dispatchers.Main) {
+                                                downloadStatus = "Download failed (HTTP ${response.code}). Check your connection."
+                                                downloadProgress = -1f
+                                            }
+                                            return@launch
                                         }
-                                        return@launch
-                                    }
 
-                                    val body = response.body ?: throw Exception("Empty response")
-                                    val totalBytes = body.contentLength()
-                                    val modelFile = llmEngine.getModelFile()
-                                    val tempFile = File(modelFile.parent, "${modelFile.name}.tmp")
+                                        val body = response.body ?: throw Exception("Empty response")
+                                        val totalBytes = body.contentLength()
+                                        val modelFile = llmEngine.getModelFile()
+                                        val tempFile = File(modelFile.parent, "${modelFile.name}.tmp")
 
-                                    body.byteStream().use { input ->
-                                        FileOutputStream(tempFile).use { output ->
-                                            val buffer = ByteArray(8192)
-                                            var bytesRead: Long = 0
-                                            var len: Int
+                                        body.byteStream().use { input ->
+                                            FileOutputStream(tempFile).use { output ->
+                                                val buffer = ByteArray(8192)
+                                                var bytesRead: Long = 0
+                                                var len: Int
 
-                                            while (input.read(buffer).also { len = it } != -1) {
-                                                output.write(buffer, 0, len)
-                                                bytesRead += len
-                                                val progress = if (totalBytes > 0) bytesRead.toFloat() / totalBytes else 0f
-                                                withContext(Dispatchers.Main) {
-                                                    downloadProgress = progress
-                                                    downloadStatus = "${bytesRead / 1024 / 1024} MB / ${totalBytes / 1024 / 1024} MB"
+                                                while (input.read(buffer).also { len = it } != -1) {
+                                                    output.write(buffer, 0, len)
+                                                    bytesRead += len
+                                                    val progress = if (totalBytes > 0) bytesRead.toFloat() / totalBytes else 0f
+                                                    withContext(Dispatchers.Main) {
+                                                        downloadProgress = progress
+                                                        val mbDown = bytesRead / 1024 / 1024
+                                                        val mbTotal = if (totalBytes > 0) totalBytes / 1024 / 1024 else 0
+                                                        downloadStatus = "Downloading: $mbDown / $mbTotal MB"
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
 
-                                    tempFile.renameTo(modelFile)
+                                        tempFile.renameTo(modelFile)
 
-                                    withContext(Dispatchers.Main) {
-                                        modelDownloaded = true
-                                        downloadProgress = -1f
-                                        downloadStatus = "Download complete!"
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e("Settings", "Model download failed: ${e.message}", e)
-                                    withContext(Dispatchers.Main) {
-                                        downloadStatus = "Failed: ${e.message}"
-                                        downloadProgress = -1f
+                                        withContext(Dispatchers.Main) {
+                                            modelDownloaded = true
+                                            downloadProgress = -1f
+                                            downloadStatus = ""
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("Settings", "Model download failed: ${e.message}", e)
+                                        withContext(Dispatchers.Main) {
+                                            downloadStatus = "Download failed: ${e.message}"
+                                            downloadProgress = -1f
+                                        }
                                     }
                                 }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Download Model (~529 MB)")
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Set Up AI Analysis (downloads ~529 MB)")
+                        }
                     }
-
-                    Text(
-                        "Or push via ADB:\nadb push gemma3-1b-it-int4.task /data/data/com.haas.campusguard/files/",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
         }
