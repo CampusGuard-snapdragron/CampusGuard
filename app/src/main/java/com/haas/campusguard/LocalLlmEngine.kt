@@ -3,6 +3,7 @@ package com.haas.campusguard
 import android.content.Context
 import android.util.Log
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
+import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
 import java.io.File
 
 class LocalLlmEngine(private val context: Context) {
@@ -25,10 +26,11 @@ class LocalLlmEngine(private val context: Context) {
 
         return try {
             Log.d(TAG, "Loading LLM model (${modelFile.length() / 1024 / 1024} MB)...")
+
+            // Engine-level options (only model path + token budget)
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.absolutePath)
-                .setMaxTokens(200)
-                .setTopK(20)
+                .setMaxTokens(512)
                 .build()
 
             llmInference = LlmInference.createFromOptions(context, options)
@@ -42,7 +44,8 @@ class LocalLlmEngine(private val context: Context) {
     }
 
     fun analyzeThreat(eventType: String, confidence: Float, verdict: String): String? {
-        if (!isInitialized || llmInference == null) return null
+        val engine = llmInference ?: return null
+        if (!isInitialized) return null
 
         val prompt = """You are CampusGuard AI, a campus security threat analyst. Analyze this security alert concisely.
 
@@ -58,7 +61,17 @@ ACTION: (1-2 recommended actions)"""
 
         return try {
             val startTime = System.currentTimeMillis()
-            val response = llmInference?.generateResponse(prompt)
+
+            // Session-level options (temperature, topK for generation control)
+            val sessionOptions = LlmInferenceSession.LlmInferenceSessionOptions.builder()
+                .setTopK(20)
+                .setTemperature(0.3f)
+                .build()
+
+            val session = LlmInferenceSession.createFromOptions(engine, sessionOptions)
+            session.addQueryChunk(prompt)
+            val response = session.generateResponse()
+
             val elapsed = System.currentTimeMillis() - startTime
             Log.d(TAG, "LLM analysis completed in ${elapsed}ms")
             response
