@@ -31,7 +31,7 @@ class LocalLlmEngine(private val context: Context) {
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.absolutePath)
                 .setMaxTokens(512)
-                .ok build()
+                .build()
 
             llmInference = LlmInference.createFromOptions(context, options)
             isInitialized = true
